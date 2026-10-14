@@ -689,7 +689,18 @@ export const App: React.FC = () => {
         />
       )}
 
-      {currentPath === '/legal' || currentPath === '/legal-policies' ? (
+      {currentPath === '/legal' ? (
+        <div className="min-h-screen w-full bg-nesty-cream flex items-center justify-center p-4">
+          <FirstLaunchConsentModal
+            onAccepted={() => {
+              setHasConsent(true);
+              navigateTo('/');
+            }}
+            onOpenTerms={() => window.open('/terms-and-conditions', '_blank')}
+            onOpenPrivacy={() => window.open('/privacy-policy', '_blank')}
+          />
+        </div>
+      ) : currentPath === '/legal-policies' || currentPath === '/legal/documents' ? (
         <LegalHubView onBack={() => navigateTo('/')} />
       ) : currentPath === '/terms-and-conditions' ? (
         <TermsAndConditionsView onBack={() => navigateTo('/')} />
