@@ -201,4 +201,88 @@ test('Nesty Shared Web + Android Backend Verification Suite', async (t) => {
     assert.match(String(legalRes.data), /<html/i);
     assert.match(String(legalRes.data), /Nesty/i);
   });
+
+  await t.test('8. SEC-T1: Spoofed x-admin-email header without valid Bearer token is strictly rejected from admin endpoints', async () => {
+    const spoofAttempt = await requestJson(
+      server,
+      'POST',
+      '/api/admin/menu',
+      { name: 'Spoofed Admin Item', price: 99 },
+      { 'x-admin-email': 'admin@cvr.ac.in', 'x-user-role': 'admin' }
+    );
+    assert.equal(spoofAttempt.status, 403, 'Unsigned x-admin-email header must NOT grant admin access');
+    assert.equal(spoofAttempt.data.success, false);
+  });
+
+  await t.test('9. SEC-T2: Student token cannot access admin endpoints or view other students records', async () => {
+    const studentAdminAttempt = await requestJson(
+      server,
+      'GET',
+      '/api/admin/students',
+      null,
+      { Authorization: `Bearer ${studentToken}` }
+    );
+    assert.equal(studentAdminAttempt.status, 403, 'Student token must be blocked from /api/admin/students');
+  });
+
+  await t.test('10. SEC-T3: IDOR prevention on GET /api/orders blocks unauthenticated and cross-student order snooping', async () => {
+    // Unauthenticated request must be 401
+    const unauthOrders = await requestJson(server, 'GET', '/api/orders?email=admin@cvr.ac.in');
+    assert.equal(unauthOrders.status, 401, 'Unauthenticated order queries must return 401');
+
+    // Student requesting other student's email gets ONLY their own orders
+    const studentOrders = await requestJson(
+      server,
+      'GET',
+      '/api/orders?email=admin@cvr.ac.in',
+      null,
+      { Authorization: `Bearer ${studentToken}` }
+    );
+    assert.equal(studentOrders.status, 200);
+    // Every returned order must belong to student@cvr.ac.in, none to admin
+    for (const ord of studentOrders.data.orders) {
+      assert.equal(ord.studentEmail.toLowerCase(), 'student@cvr.ac.in');
+    }
+  });
+
+  await t.test('11. SEC-T4: Unauthorized password reset without OTP/credential is rejected', async () => {
+    const unauthReset = await requestJson(server, 'POST', '/api/auth/reset-password', {
+      email: 'admin@cvr.ac.in',
+      newPassword: 'hackedPassword123',
+    });
+    assert.equal(unauthReset.status, 400, 'Password reset without OTP or current password must fail');
+    assert.equal(unauthReset.data.success, false);
+  });
+
+  await t.test('12. SEC-T5: Client-supplied price tampering (e.g. ₹1 for ₹25 puff) is overridden by authoritative catalog price', async () => {
+    const tamperedOrder = await requestJson(
+      server,
+      'POST',
+      '/api/orders',
+      {
+        studentEmail: 'student@cvr.ac.in',
+        block: 'CB',
+        items: [{ id: 'veg_puff', name: 'Veg Puff', price: 1, quantity: 2, isVeg: true }],
+        totalAmount: 2, // Attacker forged total
+      },
+      { Authorization: `Bearer ${studentToken}` }
+    );
+    assert.equal(tamperedOrder.status, 200);
+    // Server must enforce real price: 2 * ₹25 = ₹50
+    assert.equal(tamperedOrder.data.order.items[0].price, 25, 'Catalog price must be 25');
+    assert.equal(tamperedOrder.data.order.totalAmount, 50, 'Authoritative subtotal must be 50');
+    assert.equal(tamperedOrder.data.order.finalAmount, 50, 'Final payable must be 50');
+  });
+
+  await t.test('13. SEC-T6: Student profile updates cannot tamper with role', async () => {
+    const roleTamper = await requestJson(
+      server,
+      'PUT',
+      '/api/auth/profile',
+      { name: 'Student Hacker', role: 'admin' },
+      { Authorization: `Bearer ${studentToken}` }
+    );
+    assert.equal(roleTamper.status, 200);
+    assert.equal(roleTamper.data.user.role, 'student', 'Role must remain student');
+  });
 });

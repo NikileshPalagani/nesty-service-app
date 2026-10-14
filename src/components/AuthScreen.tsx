@@ -24,7 +24,7 @@ interface AuthScreenProps {
     rollNo: string,
     block: string
   ) => void;
-  onResetPassword: (email: string, newPassword: string) => void;
+  onResetPassword: (email: string, newPassword: string, otp?: string) => void;
   onNavigateToTerms?: () => void;
   onNavigateToPrivacy?: () => void;
 }
@@ -512,7 +512,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onResetPassword(resetEmail, resetNewPass);
+                  onResetPassword(resetEmail, resetNewPass, resetOtp);
                   setShowResetDialog(false);
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-nesty-burgundy text-nesty-cream text-xs font-extrabold"

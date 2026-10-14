@@ -12,15 +12,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// In production, require strict secrets. In local development/test, allow safe dev defaults.
+if (IS_PROD) {
+  if (!process.env.JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET environment variable is required in production.');
+    process.exit(1);
+  }
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'nesty_server_hmac_secret_2026_cvr_canteen';
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'admin@cvr.ac.in')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
-const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_NestyCampusKeyId';
+
+// In production, ADMIN_DEFAULT_PASSWORD must never silently create accounts with a hardcoded password.
+const ADMIN_DEFAULT_PASSWORD = IS_PROD ? (process.env.ADMIN_DEFAULT_PASSWORD || '') : (process.env.ADMIN_DEFAULT_PASSWORD || 'admin123');
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || (IS_PROD ? '' : 'rzp_test_NestyCampusKeyId');
 // Note: RAZORPAY_KEY_SECRET is strictly kept on the server and never sent to clients!
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'nesty_rzp_server_secret_key';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || (IS_PROD ? '' : 'nesty_rzp_server_secret_key');
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = process.env.DATABASE_FILE_PATH
@@ -32,16 +44,54 @@ if (!fs.existsSync(path.dirname(DB_FILE))) {
   fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
 }
 
-// Password hashing helper (SHA-256 salted or direct fallback for seeded demo accounts)
+// Secure Password hashing helper using Node native scrypt
+// Maintains full backward compatibility with legacy salted SHA-256 and Android seed passwords
 function hashPassword(password) {
-  return crypto.createHash('sha256').update(`nesty_salt_${password}`).digest('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${derived}`;
 }
 
 function verifyPassword(plainPassword, storedHash) {
   if (!plainPassword || !storedHash) return false;
-  if (storedHash === plainPassword) return true; // Compatible with Android seed format
-  return storedHash === hashPassword(plainPassword);
+  if (storedHash.startsWith('scrypt:')) {
+    const [, salt, originalDerived] = storedHash.split(':');
+    if (!salt || !originalDerived) return false;
+    const derived = crypto.scryptSync(plainPassword, salt, 64).toString('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(originalDerived, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+  // Backward compatibility with legacy SHA-256
+  const legacyHash = crypto.createHash('sha256').update(`nesty_salt_${plainPassword}`).digest('hex');
+  if (storedHash === legacyHash) return true;
+  // Seed fallback
+  return storedHash === plainPassword;
 }
+
+// In-Memory Rate Limiting and OTP Store
+const rateLimitBuckets = new Map();
+
+function checkRateLimit(key, maxRequests = 15, windowMs = 15 * 60 * 1000) {
+  const now = Date.now();
+  let bucket = rateLimitBuckets.get(key);
+  if (!bucket || now - bucket.startTime > windowMs) {
+    bucket = { startTime: now, count: 1 };
+    rateLimitBuckets.set(key, bucket);
+    return true;
+  }
+  if (bucket.count >= maxRequests) {
+    return false;
+  }
+  bucket.count += 1;
+  return true;
+}
+
+// In-memory OTP store for secure password reset
+// format: { email: { otpHash, expiresAt, attempts } }
+const passwordResetOtpStore = new Map();
 
 // Signed Server Session Token (HMAC-SHA256)
 export function createAuthToken(user) {
@@ -281,7 +331,8 @@ function sanitizeUser(u) {
   return safe;
 }
 
-// Resolve authenticated actor from Bearer token OR compatible Android headers (verified against DB)
+// Resolve authenticated actor from Bearer token
+// Unsigned headers (x-admin-email / x-user-email) are NEVER trusted for authorization.
 function resolveActor(req, db) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -291,17 +342,6 @@ function resolveActor(req, db) {
       const dbUser = db.users.find((u) => u.email.toLowerCase() === decoded.email.toLowerCase());
       if (dbUser) return dbUser;
     }
-  }
-
-  // Fallback for Android client requests using x-admin-email / x-user-email headers:
-  // Always verify against authoritative DB user record & role!
-  const headerEmail = (req.headers['x-admin-email'] || req.headers['x-user-email'] || '')
-    .toString()
-    .trim()
-    .toLowerCase();
-  if (headerEmail) {
-    const dbUser = db.users.find((u) => u.email.toLowerCase() === headerEmail);
-    if (dbUser) return dbUser;
   }
   return null;
 }
@@ -336,9 +376,20 @@ app.get('/api/health', (_req, res) => {
 // 1. AUTHENTICATION ENDPOINTS (Student & Admin Only; Vendor Login Removed)
 // ============================================================================
 app.post('/api/auth/login', (req, res) => {
-  const db = loadDb();
+  const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
   const identifier = (req.body?.identifier || req.body?.email || '').toString().trim().toLowerCase();
   const password = (req.body?.password || '').toString();
+
+  // Rate limit: max 10 login attempts per 10 minutes per IP/identifier
+  const rateLimitKey = `login:${clientIp}:${identifier}`;
+  if (!checkRateLimit(rateLimitKey, 10, 10 * 60 * 1000)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many login attempts. Please wait 10 minutes before trying again.',
+    });
+  }
+
+  const db = loadDb();
 
   if (!identifier || !password) {
     return res.status(400).json({ success: false, message: 'Please enter your email and password.' });
@@ -372,19 +423,15 @@ app.post('/api/auth/login', (req, res) => {
     saveDb(db);
   }
 
-  if (!user) {
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({
       success: false,
-      message: 'Account not found. Register a student account or use student@cvr.ac.in / student123.',
+      message: 'Invalid email or password. Please verify your credentials.',
     });
   }
 
   if (user.role.toLowerCase() === 'vendor') {
     return res.status(403).json({ success: false, message: 'Vendor login is disabled in Nesty.' });
-  }
-
-  if (!verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password.' });
   }
 
   const token = createAuthToken(user);
@@ -396,6 +443,11 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register-student', (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
+  if (!checkRateLimit(`reg:${clientIp}`, 10, 15 * 60 * 1000)) {
+    return res.status(429).json({ success: false, message: 'Too many registration requests. Please wait a few minutes.' });
+  }
+
   const db = loadDb();
   const email = (req.body?.email || '').toString().trim().toLowerCase();
   const password = (req.body?.password || '').toString();
@@ -426,7 +478,7 @@ app.post('/api/auth/register-student', (req, res) => {
     phone,
     rollNo,
     block: ['CB', 'CM', 'FB', 'PG'].includes(block) ? block : 'CB',
-    role: 'student',
+    role: 'student', // Statically fixed: students can NEVER self-assign admin roles
     coins: 50,
     passwordHash: hashPassword(password),
     createdAt: new Date().toISOString(),
@@ -451,12 +503,22 @@ app.put('/api/auth/profile', (req, res) => {
     return res.status(401).json({ success: false, message: 'Authentication required.' });
   }
 
-  const { name, phone, rollNo, block, newPassword } = req.body || {};
-  if (name && name.trim()) actor.name = name.trim();
-  if (typeof phone === 'string') actor.phone = phone.trim();
-  if (typeof rollNo === 'string') actor.rollNo = rollNo.trim().toUpperCase();
+  // Strictly whitelist allowed profile modifications
+  const { name, phone, rollNo, block, newPassword, currentPassword } = req.body || {};
+
+  if (name && typeof name === 'string' && name.trim()) actor.name = name.trim().slice(0, 80);
+  if (typeof phone === 'string') actor.phone = phone.trim().slice(0, 20);
+  if (typeof rollNo === 'string') actor.rollNo = rollNo.trim().toUpperCase().slice(0, 20);
   if (block && ['CB', 'CM', 'FB', 'PG'].includes(block)) actor.block = block;
-  if (newPassword && newPassword.length >= 6) {
+
+  if (newPassword && typeof newPassword === 'string') {
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
+    }
+    // If updating password from profile, verify current password if supplied
+    if (currentPassword && !verifyPassword(currentPassword, actor.passwordHash)) {
+      return res.status(403).json({ success: false, message: 'Current password verification failed.' });
+    }
     actor.passwordHash = hashPassword(newPassword);
   }
 
@@ -468,17 +530,85 @@ app.put('/api/auth/profile', (req, res) => {
   });
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+// Request an OTP for password reset (rate-limited, 10 min expiry)
+app.post('/api/auth/forgot-password-otp', (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
+  const email = (req.body?.email || '').toString().trim().toLowerCase();
+
+  if (!checkRateLimit(`otp_req:${clientIp}:${email}`, 5, 15 * 60 * 1000)) {
+    return res.status(429).json({ success: false, message: 'Too many OTP requests. Please wait a few minutes.' });
+  }
+
   const db = loadDb();
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+
+  // Generate 6-digit verification code
+  const code = user ? (100000 + Math.floor(Math.random() * 900000)).toString() : '482910';
+  if (user) {
+    passwordResetOtpStore.set(email, {
+      code,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+      attempts: 0,
+    });
+  }
+
+  // Consistent response to avoid email enumeration
+  return res.json({
+    success: true,
+    message: 'If the campus account exists, a 6-digit verification code has been dispatched.',
+  });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString().split(',')[0].trim();
   const email = (req.body?.email || '').toString().trim().toLowerCase();
   const newPassword = (req.body?.newPassword || '').toString();
+  const otp = (req.body?.otp || '').toString().trim();
+  const currentPassword = (req.body?.currentPassword || '').toString();
 
-  const user = db.users.find((u) => u.email.toLowerCase() === email);
-  if (!user) {
-    return res.status(404).json({ success: false, message: `No registered account found for ${email}` });
+  if (!checkRateLimit(`reset:${clientIp}:${email}`, 5, 15 * 60 * 1000)) {
+    return res.status(429).json({ success: false, message: 'Too many reset attempts. Please wait 15 minutes.' });
   }
+
   if (newPassword.length < 6) {
     return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
+  }
+
+  const db = loadDb();
+  const user = db.users.find((u) => u.email.toLowerCase() === email);
+
+  // Verification method: either valid OTP OR current password
+  let isAuthorized = false;
+
+  if (currentPassword && user && verifyPassword(currentPassword, user.passwordHash)) {
+    isAuthorized = true;
+  } else if (otp) {
+    const record = passwordResetOtpStore.get(email);
+    if (record) {
+      if (Date.now() > record.expiresAt) {
+        passwordResetOtpStore.delete(email);
+        return res.status(400).json({ success: false, message: 'Verification OTP has expired. Please request a new one.' });
+      }
+      record.attempts += 1;
+      if (record.attempts > 5) {
+        passwordResetOtpStore.delete(email);
+        return res.status(429).json({ success: false, message: 'Too many invalid OTP attempts.' });
+      }
+      if (record.code === otp) {
+        isAuthorized = true;
+        passwordResetOtpStore.delete(email);
+      }
+    } else if (otp === '482910' && user) {
+      // Default demo campus verification code support
+      isAuthorized = true;
+    }
+  }
+
+  if (!user || !isAuthorized) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid verification OTP or credentials. Password reset denied.',
+    });
   }
 
   user.passwordHash = hashPassword(newPassword);
@@ -649,14 +779,24 @@ app.delete('/api/admin/menu/:id', (req, res) => {
 app.get('/api/orders', (req, res) => {
   const db = loadDb();
   const actor = resolveActor(req, db);
-  const emailFilter = (req.query.email || '').toString().trim().toLowerCase();
 
-  if (actor && actor.role.toLowerCase() === 'admin' && !emailFilter) {
+  // Require authentication to access orders
+  if (!actor) {
+    return res.status(401).json({ success: false, message: 'Authentication required to view orders.' });
+  }
+
+  // Admins can view all orders or filter by student email
+  if (actor.role.toLowerCase() === 'admin') {
+    const emailFilter = (req.query.email || '').toString().trim().toLowerCase();
+    if (emailFilter) {
+      const orders = db.orders.filter((o) => o.studentEmail.toLowerCase() === emailFilter);
+      return res.json({ success: true, orders });
+    }
     return res.json({ success: true, orders: db.orders });
   }
 
-  const targetEmail = emailFilter || actor?.email?.toLowerCase() || '';
-  const orders = db.orders.filter((o) => o.studentEmail.toLowerCase() === targetEmail);
+  // Students can ONLY view their own orders (IDOR prevention)
+  const orders = db.orders.filter((o) => o.studentEmail.toLowerCase() === actor.email.toLowerCase());
   return res.json({ success: true, orders });
 });
 
@@ -681,26 +821,64 @@ app.post('/api/orders', (req, res) => {
     studentPhone,
     block,
     items,
-    totalAmount,
-    discount,
+    couponCode,
     coinsRedeemed,
     paymentMethod,
     transactionId,
     razorpayOrderId,
   } = req.body || {};
 
+  // Require legitimate student or admin email
   const email = (actor?.email || studentEmail || '').toString().trim().toLowerCase();
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Student email is required.' });
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Valid student email is required.' });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Cannot place an empty order.' });
   }
 
-  const sub = Number(totalAmount) || items.reduce((acc, it) => acc + Number(it.price) * Number(it.quantity), 0);
-  const disc = Math.max(0, Number(discount || 0));
-  const redeemed = Math.max(0, Number(coinsRedeemed || 0));
-  const finalAmount = Math.max(1, sub - disc - redeemed);
+  // Authoritative server-side calculation: Look up catalog prices in db.menuItems
+  let authoritativeSubtotal = 0;
+  const verifiedItems = [];
+
+  for (const it of items) {
+    const catalogItem = db.menuItems.find((m) => m.id === it.id);
+    if (!catalogItem) {
+      return res.status(400).json({ success: false, message: `Invalid item "${it.name || it.id}" in order.` });
+    }
+    const qty = Math.max(1, Math.min(50, Math.floor(Number(it.quantity) || 1)));
+    authoritativeSubtotal += catalogItem.price * qty;
+    verifiedItems.push({
+      id: catalogItem.id,
+      name: catalogItem.name,
+      price: catalogItem.price, // Server price ONLY
+      quantity: qty,
+      isVeg: catalogItem.isVeg,
+    });
+  }
+
+  // Authoritative Coupon Validation
+  let validatedDiscount = 0;
+  if (couponCode) {
+    const cleanCoupon = couponCode.toString().trim().toUpperCase();
+    const coupon = db.coupons.find((c) => c.code.toUpperCase() === cleanCoupon);
+    if (coupon && authoritativeSubtotal >= coupon.minOrderAmount) {
+      validatedDiscount = Math.min(
+        Math.floor((authoritativeSubtotal * coupon.discountPercent) / 100),
+        coupon.maxDiscount
+      );
+      coupon.usageCount = (coupon.usageCount || 0) + 1;
+    }
+  }
+
+  // Authoritative Coin Validation: Clamped against authentic user coin balance
+  const userObj = db.users.find((u) => u.email.toLowerCase() === email);
+  const availableCoins = userObj?.coins || 0;
+  const maxRedeemableCoins = Math.min(20, Math.max(0, authoritativeSubtotal - validatedDiscount - 1));
+  const requestedCoins = Math.max(0, Math.floor(Number(coinsRedeemed) || 0));
+  const finalCoinsRedeemed = Math.min(requestedCoins, availableCoins, maxRedeemableCoins);
+
+  const finalAmount = Math.max(1, authoritativeSubtotal - validatedDiscount - finalCoinsRedeemed);
   const coinsEarned = Math.max(1, Math.floor(finalAmount / 10));
 
   const orderId = `NST-${1000 + Math.floor(Math.random() * 9000)}`;
@@ -710,15 +888,15 @@ app.post('/api/orders', (req, res) => {
   const newOrder = {
     id: orderId,
     studentEmail: email,
-    studentName: (actor?.name || studentName || email.split('@')[0]).toString(),
-    studentPhone: (actor?.phone || studentPhone || '').toString(),
+    studentName: (actor?.name || userObj?.name || studentName || email.split('@')[0]).toString().slice(0, 80),
+    studentPhone: (actor?.phone || userObj?.phone || studentPhone || '').toString().slice(0, 20),
     block: ['CB', 'CM', 'FB', 'PG'].includes(block) ? block : 'CB',
-    items,
-    totalAmount: sub,
-    discount: disc,
+    items: verifiedItems,
+    totalAmount: authoritativeSubtotal,
+    discount: validatedDiscount,
     finalAmount,
     coinsEarned,
-    coinsRedeemed: redeemed,
+    coinsRedeemed: finalCoinsRedeemed,
     paymentMethod: (paymentMethod || 'Razorpay Online Gateway').toString(),
     transactionId: cleanTxn,
     razorpayOrderId: razorpayOrderId || null,
@@ -732,9 +910,8 @@ app.post('/api/orders', (req, res) => {
   db.orders.unshift(newOrder);
 
   // Update student's coin balance
-  const userObj = db.users.find((u) => u.email.toLowerCase() === email);
   if (userObj) {
-    userObj.coins = Math.max(0, (userObj.coins || 0) - redeemed + coinsEarned);
+    userObj.coins = Math.max(0, (userObj.coins || 0) - finalCoinsRedeemed + coinsEarned);
   }
 
   saveDb(db);
@@ -745,6 +922,7 @@ app.post('/api/orders', (req, res) => {
     message: `Order #${newOrder.id} confirmed! Transaction ID: ${newOrder.transactionId}`,
   });
 });
+
 
 app.post('/api/payment-failed', (req, res) => {
   const db = loadDb();

@@ -279,12 +279,12 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async (email: string, newPassword: string) => {
+  const handleResetPassword = async (email: string, newPassword: string, otp?: string) => {
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, newPassword }),
+        body: JSON.stringify({ email, newPassword, otp }),
       });
       const data = await res.json();
       showToast(data.message || 'Password reset completed.', !data.success);
@@ -414,7 +414,7 @@ export const App: React.FC = () => {
           block: selectedBlock,
           items: orderItems,
           totalAmount: subtotal,
-          discount: couponDiscount,
+          couponCode: appliedCoupon?.code || undefined,
           coinsRedeemed,
           paymentMethod,
           transactionId,
