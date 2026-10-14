@@ -36,6 +36,7 @@ interface CartCheckoutDrawerProps {
   onPayFailed: (paymentMethod: string, reason: string) => void;
   onClose: () => void;
   onNavigateToTerms?: () => void;
+  onNavigateToPrivacy?: () => void;
 }
 
 export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
@@ -58,6 +59,7 @@ export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
   onPayFailed,
   onClose,
   onNavigateToTerms,
+  onNavigateToPrivacy,
 }) => {
   const [couponInput, setCouponInput] = useState('');
   const [showGatewaySheet, setShowGatewaySheet] = useState(false);
@@ -371,6 +373,21 @@ export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
                   className="font-bold text-nesty-burgundy underline hover:text-nesty-goldDark"
                 >
                   Terms &amp; Conditions
+                </a>{' '}
+                and{' '}
+                <a
+                  href="/privacy-policy"
+                  data-testid="checkout_privacy_link"
+                  onClick={(e) => {
+                    if (onNavigateToPrivacy) {
+                      e.preventDefault();
+                      onClose();
+                      onNavigateToPrivacy();
+                    }
+                  }}
+                  className="font-bold text-nesty-burgundy underline hover:text-nesty-goldDark"
+                >
+                  Privacy Policy
                 </a>
               </div>
               <div className="flex items-center gap-1">

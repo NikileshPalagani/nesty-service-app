@@ -173,4 +173,25 @@ test('Nesty Shared Web + Android Backend Verification Suite', async (t) => {
     assert.match(String(termsRes.data), /<html/i);
     assert.match(String(termsRes.data), /Nesty/i);
   });
+
+  await t.test('5. Direct navigation to /privacy-policy serves index.html with 200 OK without 404', async () => {
+    const privacyRes = await requestJson(server, 'GET', '/privacy-policy');
+    assert.equal(privacyRes.status, 200);
+    assert.match(String(privacyRes.data), /<html/i);
+    assert.match(String(privacyRes.data), /Nesty/i);
+  });
+
+  await t.test('6. POST /api/consent/record safely registers pre-login installation consent', async () => {
+    const consentRes = await requestJson(server, 'POST', '/api/consent/record', {
+      termsVersion: '1.0',
+      privacyVersion: '1.0',
+      installationId: 'inst_test_suite_492',
+      acceptedAt: new Date().toISOString(),
+    });
+    assert.equal(consentRes.status, 200);
+    assert.equal(consentRes.data.success, true);
+    assert.equal(consentRes.data.record.termsVersion, '1.0');
+    assert.equal(consentRes.data.record.privacyVersion, '1.0');
+    assert.equal(consentRes.data.record.installationId, 'inst_test_suite_492');
+  });
 });

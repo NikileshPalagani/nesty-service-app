@@ -963,6 +963,38 @@ app.delete('/api/admin/announcements/:id', (req, res) => {
   return res.json({ success: true, announcements: db.announcements, message: 'Announcement deleted.' });
 });
 
+// Pre-login installation-scoped anonymous legal consent register
+app.post('/api/consent/record', (req, res) => {
+  const { termsVersion, privacyVersion, acceptedAt, installationId } = req.body || {};
+  if (!termsVersion || !privacyVersion) {
+    return res.status(400).json({ success: false, message: 'Missing document version details.' });
+  }
+
+  const db = loadDb();
+  if (!Array.isArray(db.consents)) {
+    db.consents = [];
+  }
+
+  const record = {
+    id: `cst_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    installationId: (installationId || 'unknown').toString().slice(0, 80),
+    termsVersion: String(termsVersion),
+    privacyVersion: String(privacyVersion),
+    acceptedAt: acceptedAt || new Date().toISOString(),
+    ipAddress: (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString().split(',')[0].trim(),
+    userAgent: (req.headers['user-agent'] || 'unknown').toString().slice(0, 160),
+  };
+
+  db.consents.push(record);
+  // Keep last 1000 consent logs to avoid unbounded growth
+  if (db.consents.length > 1000) {
+    db.consents = db.consents.slice(-1000);
+  }
+  saveDb(db);
+
+  return res.json({ success: true, record });
+});
+
 // Serve static production frontend build from ../dist
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {

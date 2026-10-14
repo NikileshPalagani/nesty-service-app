@@ -575,6 +575,7 @@ interface StudentProfileViewProps {
   ) => void;
   onSignOut: () => void;
   onNavigateToTerms?: () => void;
+  onNavigateToPrivacy?: () => void;
 }
 
 export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
@@ -582,6 +583,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   onUpdateProfile,
   onSignOut,
   onNavigateToTerms,
+  onNavigateToPrivacy,
 }) => {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone);
@@ -712,6 +714,22 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               className="text-xs font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
             >
               Terms &amp; Conditions
+            </a>
+
+            <span className="text-nesty-gold">•</span>
+
+            <a
+              href="/privacy-policy"
+              data-testid="profile_privacy_link"
+              onClick={(e) => {
+                if (onNavigateToPrivacy) {
+                  e.preventDefault();
+                  onNavigateToPrivacy();
+                }
+              }}
+              className="text-xs font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Privacy Policy
             </a>
 
             <button

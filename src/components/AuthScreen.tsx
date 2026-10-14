@@ -26,6 +26,7 @@ interface AuthScreenProps {
   ) => void;
   onResetPassword: (email: string, newPassword: string) => void;
   onNavigateToTerms?: () => void;
+  onNavigateToPrivacy?: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
@@ -34,6 +35,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onRegisterStudent,
   onResetPassword,
   onNavigateToTerms,
+  onNavigateToPrivacy,
 }) => {
   const [selectedTab, setSelectedTab] = useState<0 | 1>(0);
   const [loginEmail, setLoginEmail] = useState('');
@@ -381,6 +383,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     >
                       Terms &amp; Conditions
                     </a>{' '}
+                    and{' '}
+                    <a
+                      href="/privacy-policy"
+                      onClick={(e) => {
+                        if (onNavigateToPrivacy) {
+                          e.preventDefault();
+                          onNavigateToPrivacy();
+                        }
+                      }}
+                      className="font-extrabold text-nesty-burgundy underline hover:text-nesty-goldDark"
+                    >
+                      Privacy Policy
+                    </a>{' '}
                     for NESTY campus ordering.
                   </span>
                 </label>
@@ -403,7 +418,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             <CheckCircle2 className="w-4 h-4 text-nesty-goldDark" />
             <span>Official Nesty Campus Dining • Powered by Secure Order IDs</span>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             <a
               href="/terms-and-conditions"
               data-testid="auth_footer_terms_link"
@@ -416,6 +431,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               className="text-[11px] font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
             >
               Terms &amp; Conditions
+            </a>
+            <span className="text-nesty-gold">•</span>
+            <a
+              href="/privacy-policy"
+              data-testid="auth_footer_privacy_link"
+              onClick={(e) => {
+                if (onNavigateToPrivacy) {
+                  e.preventDefault();
+                  onNavigateToPrivacy();
+                }
+              }}
+              className="text-[11px] font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Privacy Policy
             </a>
           </div>
         </div>

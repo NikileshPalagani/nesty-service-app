@@ -24,15 +24,39 @@ import {
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { CartCheckoutDrawer } from './components/CartCheckoutDrawer';
 import { NestyQrScannerModal } from './components/NestyQrScannerModal';
-import { OrderReceiptModal } from './components/OrderReceiptModal';
 import { TermsAndConditionsView } from './components/TermsAndConditionsView';
+import { PrivacyPolicyView } from './components/PrivacyPolicyView';
+import {
+  FirstLaunchConsentModal,
+  CURRENT_TERMS_VERSION,
+  CURRENT_PRIVACY_VERSION,
+  CONSENT_STORAGE_KEY,
+  LegalConsentRecord,
+} from './components/FirstLaunchConsentModal';
 import { CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 
 const SESSION_TOKEN_KEY = 'nesty_web_auth_token';
 const SESSION_USER_KEY = 'nesty_web_auth_user';
 const SPLASH_SEEN_KEY = 'nesty_web_splash_played';
 
+const checkLegalConsent = (): boolean => {
+  try {
+    const raw = localStorage.getItem(CONSENT_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed: LegalConsentRecord = JSON.parse(raw);
+    return (
+      parsed.termsVersion === CURRENT_TERMS_VERSION &&
+      parsed.privacyVersion === CURRENT_PRIVACY_VERSION &&
+      Boolean(parsed.acceptedAt)
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const App: React.FC = () => {
+  const [hasConsent, setHasConsent] = useState<boolean>(() => checkLegalConsent());
+
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(SPLASH_SEEN_KEY) !== 'true';
@@ -666,6 +690,14 @@ export const App: React.FC = () => {
 
       {currentPath === '/terms-and-conditions' ? (
         <TermsAndConditionsView onBack={() => navigateTo('/')} />
+      ) : currentPath === '/privacy-policy' ? (
+        <PrivacyPolicyView onBack={() => navigateTo('/')} />
+      ) : !hasConsent ? (
+        <FirstLaunchConsentModal
+          onAccepted={() => setHasConsent(true)}
+          onOpenTerms={() => window.open('/terms-and-conditions', '_blank')}
+          onOpenPrivacy={() => window.open('/privacy-policy', '_blank')}
+        />
       ) : !currentUser ? (
         <AuthScreen
           isLoading={isAuthLoading}
@@ -673,6 +705,7 @@ export const App: React.FC = () => {
           onRegisterStudent={handleRegisterStudent}
           onResetPassword={handleResetPassword}
           onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
+          onNavigateToPrivacy={() => navigateTo('/privacy-policy')}
         />
       ) : (
         <>
@@ -716,6 +749,7 @@ export const App: React.FC = () => {
                 onNavigate={setStudentDestination}
                 onSignOut={handleSignOut}
                 onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
+                onNavigateToPrivacy={() => navigateTo('/privacy-policy')}
               />
 
               <main className="flex-1 p-4 sm:p-6 min-w-0">
@@ -756,6 +790,7 @@ export const App: React.FC = () => {
                     onUpdateProfile={handleUpdateProfile}
                     onSignOut={handleSignOut}
                     onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
+                    onNavigateToPrivacy={() => navigateTo('/privacy-policy')}
                   />
                 )}
               </main>
@@ -782,6 +817,7 @@ export const App: React.FC = () => {
             onPayFailed={handlePaymentFailed}
             onClose={() => setIsCartOpen(false)}
             onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
+            onNavigateToPrivacy={() => navigateTo('/privacy-policy')}
           />
 
           <NestyQrScannerModal
@@ -821,6 +857,18 @@ export const App: React.FC = () => {
                   className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
                 >
                   Terms &amp; Conditions
+                </a>
+                <span className="text-nesty-gold">•</span>
+                <a
+                  href="/privacy-policy"
+                  data-testid="global_footer_privacy_link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigateTo('/privacy-policy');
+                  }}
+                  className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+                >
+                  Privacy Policy
                 </a>
                 <span className="text-nesty-gold">•</span>
                 <span className="text-nesty-textSecondary/80">© {new Date().getFullYear()} NESTY</span>

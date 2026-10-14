@@ -138,6 +138,7 @@ interface StudentNavigationProps {
   onNavigate: (dest: StudentDestination) => void;
   onSignOut: () => void;
   onNavigateToTerms?: () => void;
+  onNavigateToPrivacy?: () => void;
 }
 
 export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
@@ -145,6 +146,7 @@ export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
   onNavigate,
   onSignOut,
   onNavigateToTerms,
+  onNavigateToPrivacy,
 }) => {
   const navItems: Array<{
     id: StudentDestination;
@@ -218,7 +220,7 @@ export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
             Present your Order ID or Transaction ID at any campus block counter.
           </div>
 
-          <div className="text-center pt-1">
+          <div className="flex items-center justify-center gap-2 pt-1 text-[11px] font-bold">
             <a
               href="/terms-and-conditions"
               data-testid="sidebar_terms_link"
@@ -228,9 +230,23 @@ export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
                   onNavigateToTerms();
                 }
               }}
-              className="text-[11px] font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+              className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
             >
               Terms &amp; Conditions
+            </a>
+            <span className="text-nesty-gold">•</span>
+            <a
+              href="/privacy-policy"
+              data-testid="sidebar_privacy_link"
+              onClick={(e) => {
+                if (onNavigateToPrivacy) {
+                  e.preventDefault();
+                  onNavigateToPrivacy();
+                }
+              }}
+              className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Privacy Policy
             </a>
           </div>
 
