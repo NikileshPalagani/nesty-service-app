@@ -194,4 +194,11 @@ test('Nesty Shared Web + Android Backend Verification Suite', async (t) => {
     assert.equal(consentRes.data.record.privacyVersion, '1.0');
     assert.equal(consentRes.data.record.installationId, 'inst_test_suite_492');
   });
+
+  await t.test('7. Direct navigation to /legal serves unified Legal Center index.html with 200 OK without 404', async () => {
+    const legalRes = await requestJson(server, 'GET', '/legal');
+    assert.equal(legalRes.status, 200);
+    assert.match(String(legalRes.data), /<html/i);
+    assert.match(String(legalRes.data), /Nesty/i);
+  });
 });

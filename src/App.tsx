@@ -26,6 +26,7 @@ import { CartCheckoutDrawer } from './components/CartCheckoutDrawer';
 import { NestyQrScannerModal } from './components/NestyQrScannerModal';
 import { TermsAndConditionsView } from './components/TermsAndConditionsView';
 import { PrivacyPolicyView } from './components/PrivacyPolicyView';
+import { LegalHubView } from './components/LegalHubView';
 import {
   FirstLaunchConsentModal,
   CURRENT_TERMS_VERSION,
@@ -688,7 +689,9 @@ export const App: React.FC = () => {
         />
       )}
 
-      {currentPath === '/terms-and-conditions' ? (
+      {currentPath === '/legal' || currentPath === '/legal-policies' ? (
+        <LegalHubView onBack={() => navigateTo('/')} />
+      ) : currentPath === '/terms-and-conditions' ? (
         <TermsAndConditionsView onBack={() => navigateTo('/')} />
       ) : currentPath === '/privacy-policy' ? (
         <PrivacyPolicyView onBack={() => navigateTo('/')} />
@@ -848,27 +851,15 @@ export const App: React.FC = () => {
               </div>
               <div className="flex items-center gap-4 text-[11px] font-bold">
                 <a
-                  href="/terms-and-conditions"
-                  data-testid="global_footer_terms_link"
+                  href="/legal"
+                  data-testid="global_footer_legal_hub_link"
                   onClick={(e) => {
                     e.preventDefault();
-                    navigateTo('/terms-and-conditions');
+                    navigateTo('/legal');
                   }}
                   className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
                 >
-                  Terms &amp; Conditions
-                </a>
-                <span className="text-nesty-gold">•</span>
-                <a
-                  href="/privacy-policy"
-                  data-testid="global_footer_privacy_link"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigateTo('/privacy-policy');
-                  }}
-                  className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
-                >
-                  Privacy Policy
+                  Legal Center (Terms &amp; Privacy)
                 </a>
                 <span className="text-nesty-gold">•</span>
                 <span className="text-nesty-textSecondary/80">© {new Date().getFullYear()} NESTY</span>
