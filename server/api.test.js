@@ -166,4 +166,11 @@ test('Nesty Shared Web + Android Backend Verification Suite', async (t) => {
     assert.equal(scanCounter.data.valid, true);
     assert.equal(scanCounter.data.type, 'CAMPUS_COUNTER');
   });
+
+  await t.test('4. Direct navigation to /terms-and-conditions serves index.html with 200 OK without 404', async () => {
+    const termsRes = await requestJson(server, 'GET', '/terms-and-conditions');
+    assert.equal(termsRes.status, 200);
+    assert.match(String(termsRes.data), /<html/i);
+    assert.match(String(termsRes.data), /Nesty/i);
+  });
 });

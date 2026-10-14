@@ -574,12 +574,14 @@ interface StudentProfileViewProps {
     newPassword?: string
   ) => void;
   onSignOut: () => void;
+  onNavigateToTerms?: () => void;
 }
 
 export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   user,
   onUpdateProfile,
   onSignOut,
+  onNavigateToTerms,
 }) => {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone);
@@ -697,15 +699,31 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
             Save Profile Changes
           </button>
 
-          <button
-            type="button"
-            onClick={onSignOut}
-            data-testid="profile_sign_out_button"
-            className="px-5 py-2.5 rounded-xl border border-nesty-error bg-nesty-errorBg text-nesty-error font-extrabold text-xs flex items-center gap-1.5 hover:bg-nesty-error hover:text-white transition"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Sign Out of Nesty</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href="/terms-and-conditions"
+              data-testid="profile_terms_link"
+              onClick={(e) => {
+                if (onNavigateToTerms) {
+                  e.preventDefault();
+                  onNavigateToTerms();
+                }
+              }}
+              className="text-xs font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Terms &amp; Conditions
+            </a>
+
+            <button
+              type="button"
+              onClick={onSignOut}
+              data-testid="profile_sign_out_button"
+              className="px-5 py-2.5 rounded-xl border border-nesty-error bg-nesty-errorBg text-nesty-error font-extrabold text-xs flex items-center gap-1.5 hover:bg-nesty-error hover:text-white transition"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out of Nesty</span>
+            </button>
+          </div>
         </div>
       </form>
     </div>

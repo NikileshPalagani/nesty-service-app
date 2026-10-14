@@ -25,6 +25,7 @@ interface AuthScreenProps {
     block: string
   ) => void;
   onResetPassword: (email: string, newPassword: string) => void;
+  onNavigateToTerms?: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
@@ -32,6 +33,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onLogin,
   onRegisterStudent,
   onResetPassword,
+  onNavigateToTerms,
 }) => {
   const [selectedTab, setSelectedTab] = useState<0 | 1>(0);
   const [loginEmail, setLoginEmail] = useState('');
@@ -357,6 +359,33 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </div>
               </div>
 
+              <div className="pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-nesty-textSecondary select-none">
+                  <input
+                    type="checkbox"
+                    data-testid="register_terms_checkbox"
+                    required
+                    className="mt-0.5 w-4 h-4 rounded border-nesty-creamBorder text-nesty-burgundy focus:ring-nesty-gold cursor-pointer shrink-0"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a
+                      href="/terms-and-conditions"
+                      onClick={(e) => {
+                        if (onNavigateToTerms) {
+                          e.preventDefault();
+                          onNavigateToTerms();
+                        }
+                      }}
+                      className="font-extrabold text-nesty-burgundy underline hover:text-nesty-goldDark"
+                    >
+                      Terms &amp; Conditions
+                    </a>{' '}
+                    for NESTY campus ordering.
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -369,9 +398,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           )}
         </div>
 
-        <div className="mt-5 flex items-center gap-1.5 text-xs text-nesty-textSecondary">
-          <CheckCircle2 className="w-4 h-4 text-nesty-goldDark" />
-          <span>Official Nesty Campus Dining • Powered by Secure Order IDs</span>
+        <div className="mt-5 flex flex-col items-center gap-2 text-xs text-nesty-textSecondary">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-nesty-goldDark" />
+            <span>Official Nesty Campus Dining • Powered by Secure Order IDs</span>
+          </div>
+          <div>
+            <a
+              href="/terms-and-conditions"
+              data-testid="auth_footer_terms_link"
+              onClick={(e) => {
+                if (onNavigateToTerms) {
+                  e.preventDefault();
+                  onNavigateToTerms();
+                }
+              }}
+              className="text-[11px] font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Terms &amp; Conditions
+            </a>
+          </div>
         </div>
       </div>
 

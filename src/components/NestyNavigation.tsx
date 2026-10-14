@@ -137,12 +137,14 @@ interface StudentNavigationProps {
   currentDestination: StudentDestination;
   onNavigate: (dest: StudentDestination) => void;
   onSignOut: () => void;
+  onNavigateToTerms?: () => void;
 }
 
 export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
   currentDestination,
   onNavigate,
   onSignOut,
+  onNavigateToTerms,
 }) => {
   const navItems: Array<{
     id: StudentDestination;
@@ -214,6 +216,22 @@ export const StudentSidebarNav: React.FC<StudentNavigationProps> = ({
               <span>Zero-QR Fast Pickup</span>
             </div>
             Present your Order ID or Transaction ID at any campus block counter.
+          </div>
+
+          <div className="text-center pt-1">
+            <a
+              href="/terms-and-conditions"
+              data-testid="sidebar_terms_link"
+              onClick={(e) => {
+                if (onNavigateToTerms) {
+                  e.preventDefault();
+                  onNavigateToTerms();
+                }
+              }}
+              className="text-[11px] font-bold text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+            >
+              Terms &amp; Conditions
+            </a>
           </div>
 
           <button

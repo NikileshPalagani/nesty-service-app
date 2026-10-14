@@ -22,6 +22,7 @@ import {
   Users,
   UtensilsCrossed,
   X,
+  FileText,
 } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -57,6 +58,7 @@ interface AdminDashboardViewProps {
   onCreateAnnouncement: (title: string, message: string) => void;
   onDeleteAnnouncement: (id: string) => void;
   onRefreshAll: () => void;
+  onNavigateToTerms?: () => void;
 }
 
 type AdminSection = 'PRODUCTS' | 'ORDERS' | 'STUDENTS' | 'COUPONS' | 'ANNOUNCEMENTS';
@@ -88,6 +90,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onCreateAnnouncement,
   onDeleteAnnouncement,
   onRefreshAll,
+  onNavigateToTerms,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminSection>('PRODUCTS');
 
@@ -233,6 +236,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <RefreshCw className="w-4 h-4 text-nesty-gold" />
               <span>Sync</span>
             </button>
+
+            <a
+              href="/terms-and-conditions"
+              data-testid="admin_terms_link"
+              onClick={(e) => {
+                if (onNavigateToTerms) {
+                  e.preventDefault();
+                  onNavigateToTerms();
+                }
+              }}
+              className="px-3.5 py-3 rounded-2xl bg-nesty-cream/15 hover:bg-nesty-cream/25 border border-nesty-gold text-xs font-bold text-nesty-cream flex items-center gap-1.5 transition"
+            >
+              <FileText className="w-4 h-4 text-nesty-gold" />
+              <span>Terms</span>
+            </a>
           </div>
         </div>
 

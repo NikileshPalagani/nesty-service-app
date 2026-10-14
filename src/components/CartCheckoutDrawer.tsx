@@ -35,6 +35,7 @@ interface CartCheckoutDrawerProps {
   onPaySuccess: (paymentMethod: string, transactionId: string, razorpayOrderId?: string) => void;
   onPayFailed: (paymentMethod: string, reason: string) => void;
   onClose: () => void;
+  onNavigateToTerms?: () => void;
 }
 
 export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
@@ -56,6 +57,7 @@ export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
   onPaySuccess,
   onPayFailed,
   onClose,
+  onNavigateToTerms,
 }) => {
   const [couponInput, setCouponInput] = useState('');
   const [showGatewaySheet, setShowGatewaySheet] = useState(false);
@@ -353,9 +355,28 @@ export const CartCheckoutDrawer: React.FC<CartCheckoutDrawerProps> = ({
               <span>Pay via UPI App (PhonePe / GPay / Paytm)</span>
             </button>
 
-            <div className="flex items-center justify-center gap-1 text-[10px] text-nesty-textSecondary pt-0.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-nesty-success" />
-              <span>Instant Order & Transaction ID Receipt (No QR Required)</span>
+            <div className="flex flex-col items-center justify-center gap-1 text-[10px] text-nesty-textSecondary pt-0.5">
+              <div className="text-center">
+                <span>By placing an order, you agree to the </span>
+                <a
+                  href="/terms-and-conditions"
+                  data-testid="checkout_terms_link"
+                  onClick={(e) => {
+                    if (onNavigateToTerms) {
+                      e.preventDefault();
+                      onClose();
+                      onNavigateToTerms();
+                    }
+                  }}
+                  className="font-bold text-nesty-burgundy underline hover:text-nesty-goldDark"
+                >
+                  Terms &amp; Conditions
+                </a>
+              </div>
+              <div className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-nesty-success" />
+                <span>Instant Order & Transaction ID Receipt (No QR Required)</span>
+              </div>
             </div>
           </div>
         )}

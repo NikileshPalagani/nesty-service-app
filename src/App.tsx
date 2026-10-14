@@ -25,7 +25,8 @@ import { AdminDashboardView } from './components/AdminDashboardView';
 import { CartCheckoutDrawer } from './components/CartCheckoutDrawer';
 import { NestyQrScannerModal } from './components/NestyQrScannerModal';
 import { OrderReceiptModal } from './components/OrderReceiptModal';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { TermsAndConditionsView } from './components/TermsAndConditionsView';
+import { CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 
 const SESSION_TOKEN_KEY = 'nesty_web_auth_token';
 const SESSION_USER_KEY = 'nesty_web_auth_user';
@@ -39,6 +40,29 @@ export const App: React.FC = () => {
       return true;
     }
   });
+
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    try {
+      return window.location.pathname;
+    } catch {
+      return '/';
+    }
+  });
+
+  const navigateTo = useCallback((path: string) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setCurrentPath(path);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const [authToken, setAuthToken] = useState<string | null>(() => {
     try {
@@ -640,12 +664,15 @@ export const App: React.FC = () => {
         />
       )}
 
-      {!currentUser ? (
+      {currentPath === '/terms-and-conditions' ? (
+        <TermsAndConditionsView onBack={() => navigateTo('/')} />
+      ) : !currentUser ? (
         <AuthScreen
           isLoading={isAuthLoading}
           onLogin={handleLogin}
           onRegisterStudent={handleRegisterStudent}
           onResetPassword={handleResetPassword}
+          onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
         />
       ) : (
         <>
@@ -679,6 +706,7 @@ export const App: React.FC = () => {
                 onCreateAnnouncement={handleAdminCreateAnnouncement}
                 onDeleteAnnouncement={handleAdminDeleteAnnouncement}
                 onRefreshAll={syncAllFromBackend}
+                onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
               />
             </main>
           ) : (
@@ -687,6 +715,7 @@ export const App: React.FC = () => {
                 currentDestination={studentDestination}
                 onNavigate={setStudentDestination}
                 onSignOut={handleSignOut}
+                onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
               />
 
               <main className="flex-1 p-4 sm:p-6 min-w-0">
@@ -726,6 +755,7 @@ export const App: React.FC = () => {
                     user={currentUser}
                     onUpdateProfile={handleUpdateProfile}
                     onSignOut={handleSignOut}
+                    onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
                   />
                 )}
               </main>
@@ -751,6 +781,7 @@ export const App: React.FC = () => {
             onPaySuccess={handleVerifiedPaymentSuccess}
             onPayFailed={handlePaymentFailed}
             onClose={() => setIsCartOpen(false)}
+            onNavigateToTerms={() => navigateTo('/terms-and-conditions')}
           />
 
           <NestyQrScannerModal
@@ -769,6 +800,33 @@ export const App: React.FC = () => {
             onUpdateStatus={handleAdminUpdateOrderStatus}
             onClose={() => setSelectedReceiptOrder(null)}
           />
+
+          <footer
+            data-testid="nesty_global_footer"
+            className="w-full bg-nesty-creamSurface border-t border-nesty-gold/50 py-4 px-4 mt-auto mb-16 md:mb-0 text-center text-xs text-nesty-textSecondary"
+          >
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-nesty-burgundy tracking-wider">NESTY</span>
+                <span>• Smart Campus Food Ordering • CVR Canteen</span>
+              </div>
+              <div className="flex items-center gap-4 text-[11px] font-bold">
+                <a
+                  href="/terms-and-conditions"
+                  data-testid="global_footer_terms_link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigateTo('/terms-and-conditions');
+                  }}
+                  className="text-nesty-burgundy underline hover:text-nesty-goldDark transition"
+                >
+                  Terms &amp; Conditions
+                </a>
+                <span className="text-nesty-gold">•</span>
+                <span className="text-nesty-textSecondary/80">© {new Date().getFullYear()} NESTY</span>
+              </div>
+            </div>
+          </footer>
         </>
       )}
 
