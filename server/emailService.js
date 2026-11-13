@@ -18,14 +18,14 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
   // Ensure fresh resolution of environment variables on every call
   const brevoApiKey = (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim();
   const senderEmail = (
-    process.env.CAMPUS_EMAIL_SENDER ||
     process.env.BREVO_SENDER_EMAIL ||
+    process.env.CAMPUS_EMAIL_SENDER ||
     process.env.EMAIL_FROM ||
-    'canteen@cvr.ac.in'
+    ''
   ).trim();
   const senderName = (
-    process.env.CAMPUS_EMAIL_SENDER_NAME ||
     process.env.BREVO_SENDER_NAME ||
+    process.env.CAMPUS_EMAIL_SENDER_NAME ||
     'NESTY Campus Canteen'
   ).trim();
 
@@ -36,6 +36,12 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
 
   // 1. Try Brevo Transactional Email REST API
   if (brevoApiKey && !brevoApiKey.includes('placeholder') && !brevoApiKey.includes('replace_')) {
+    if (!senderEmail) {
+      const msg = 'Missing BREVO_SENDER_EMAIL in environment variables. Brevo requires a verified sender email address.';
+      console.error(`[EMAIL_SERVICE] ${msg}`);
+      throw new Error(msg);
+    }
+
     try {
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -78,11 +84,12 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
 
   // 2. Try SMTP Transport (Brevo relay or custom campus SMTP)
   const smtpHost = process.env.BREVO_SMTP_KEY ? 'smtp-relay.brevo.com' : process.env.SMTP_HOST;
-  const smtpUser = process.env.BREVO_SMTP_USER || process.env.BREVO_SMTP_KEY ? (process.env.BREVO_SMTP_USER || senderEmail) : process.env.SMTP_USER;
+  const smtpUser = process.env.BREVO_SMTP_USER || (process.env.BREVO_SMTP_KEY ? (process.env.BREVO_SMTP_USER || senderEmail) : process.env.SMTP_USER);
   const smtpPass = process.env.BREVO_SMTP_KEY || process.env.SMTP_PASS;
   const smtpPort = Number(process.env.SMTP_PORT || (process.env.BREVO_SMTP_KEY ? 587 : 587));
 
   if (smtpHost && smtpUser && smtpPass) {
+    const finalSender = senderEmail || (process.env.BREVO_SMTP_USER || 'canteen@cvr.ac.in');
     try {
       const transporter = nodemailer.createTransport({
         host: smtpHost,
@@ -92,7 +99,7 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
       });
 
       const info = await transporter.sendMail({
-        from: `"${senderName}" <${senderEmail}>`,
+        from: `"${senderName}" <${finalSender}>`,
         to: recipientEmail,
         subject,
         text,
@@ -116,15 +123,15 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
 
   // 4. Provider missing in live environment
   console.warn('[EMAIL_SERVICE] No active email provider configured (Missing BREVO_API_KEY or SMTP credentials).');
-  throw new Error('Email provider is unconfigured. Please configure BREVO_API_KEY in environment variables.');
+  throw new Error('Email provider is unconfigured. Please configure BREVO_API_KEY and BREVO_SENDER_EMAIL in environment variables.');
 }
 
 /**
- * Builds standard campus OTP email template
+ * Builds standard campus OTP email template (5 minutes expiry)
  */
 export function buildVerificationOtpEmail(code, purpose = 'Email Verification') {
   const subject = `Your NESTY Canteen ${purpose}: ${code}`;
-  const text = `Hello,\n\nYour NESTY verification code is: ${code}\nThis code is valid for 10 minutes.\nNever share this code with anyone.`;
+  const text = `Hello,\n\nYour NESTY verification code is: ${code}\nThis code is valid for 5 minutes.\nNever share this code with anyone.`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1.5px solid #F0E6D8; border-radius: 16px; background-color: #FFFFFF;">
       <div style="text-align: center; margin-bottom: 20px;">
@@ -136,7 +143,7 @@ export function buildVerificationOtpEmail(code, purpose = 'Email Verification') 
         <span style="font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #6B1D2F; font-family: monospace;">${code}</span>
       </div>
       <p style="font-size: 12px; color: #64748B; line-height: 1.4;">
-        This code is valid for <strong>10 minutes</strong>. If you did not make this request, please ignore this email.
+        This code is valid for <strong>5 minutes</strong>. If you did not make this request, please ignore this email.
       </p>
       <div style="border-top: 1px solid #F1E5D8; margin-top: 20px; padding-top: 12px; text-align: center; font-size: 11px; color: #94A3B8;">
         NESTY Smart Campus Food Ordering System

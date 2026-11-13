@@ -523,7 +523,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     className="w-full px-4 py-3 rounded-xl bg-nesty-cream border border-nesty-creamBorder text-base font-mono tracking-widest text-center focus:outline-none focus:border-nesty-burgundy"
                   />
                   <p className="text-[11px] text-stone-500 text-center mt-1">
-                    Valid for 10 minutes. Check your college inbox or spam folder.
+                    Valid for 5 minutes. Check your college inbox or spam folder.
                   </p>
                 </div>
 

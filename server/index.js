@@ -894,7 +894,7 @@ app.post('/api/auth/login', async (req, res) => {
       const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
       emailVerificationOtps.set(user.email, {
         otpHash,
-        expiresAt: Date.now() + 10 * 60 * 1000,
+        expiresAt: Date.now() + 5 * 60 * 1000,
         attempts: 0,
         cooldownUntil: Date.now() + 60 * 1000,
       });
@@ -1012,6 +1012,13 @@ app.post('/api/auth/register-student', async (req, res) => {
   if (!email.includes('@') || !email.includes('.')) {
     return res.status(400).json({ success: false, message: 'Please enter a valid campus email address.' });
   }
+  // Enforce CVR college domain restriction for student registration
+  if (!email.endsWith('@cvr.ac.in')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Student registration is restricted to official CVR College email addresses (@cvr.ac.in).',
+    });
+  }
   if (password.length < 6) {
     return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
   }
@@ -1066,7 +1073,7 @@ app.post('/api/auth/register-student', async (req, res) => {
 
   emailVerificationOtps.set(email, {
     otpHash,
-    expiresAt: Date.now() + 10 * 60 * 1000,
+    expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     cooldownUntil: Date.now() + 60 * 1000,
   });
@@ -1120,7 +1127,7 @@ app.post('/api/auth/verify-email/send-otp', async (req, res) => {
 
   emailVerificationOtps.set(email, {
     otpHash,
-    expiresAt: Date.now() + 10 * 60 * 1000,
+    expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     cooldownUntil: Date.now() + 60 * 1000,
   });
@@ -1352,7 +1359,7 @@ app.post('/api/auth/forgot-password/send-otp', async (req, res) => {
 
     passwordResetOtps.set(email, {
       otpHash,
-      expiresAt: Date.now() + 10 * 60 * 1000,
+      expiresAt: Date.now() + 5 * 60 * 1000,
       attempts: 0,
       cooldownUntil: Date.now() + 60 * 1000,
     });
@@ -1519,7 +1526,7 @@ app.post('/api/auth/change-password/send-otp', async (req, res) => {
 
   changePasswordOtps.set(email, {
     otpHash,
-    expiresAt: Date.now() + 10 * 60 * 1000,
+    expiresAt: Date.now() + 5 * 60 * 1000,
     attempts: 0,
     cooldownUntil: Date.now() + 60 * 1000,
   });

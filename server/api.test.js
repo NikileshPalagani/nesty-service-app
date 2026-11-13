@@ -390,6 +390,16 @@ test('NESTY Complete End-to-End System Verification Suite (Requirements 1-11)', 
     });
     assert.equal(invalidEmailRes.status, 400);
     assert.equal(invalidEmailRes.data.success, false);
+
+    // Non-CVR email rejection check
+    const nonCvrEmailRes = await requestJson(server, 'POST', '/api/auth/register-student', {
+      email: 'student@gmail.com',
+      password: 'validPass123',
+      name: 'External Student',
+    });
+    assert.equal(nonCvrEmailRes.status, 400);
+    assert.equal(nonCvrEmailRes.data.success, false);
+    assert.ok(nonCvrEmailRes.data.message.includes('@cvr.ac.in'));
   });
 
   // -------------------------------------------------------------------------
