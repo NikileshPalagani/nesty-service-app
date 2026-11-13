@@ -130,23 +130,31 @@ export async function sendCampusEmail({ to, name = 'Student', subject, text, htm
  * Builds standard campus OTP email template (5 minutes expiry)
  */
 export function buildVerificationOtpEmail(code, purpose = 'Email Verification') {
-  const subject = `Your NESTY Canteen ${purpose}: ${code}`;
-  const text = `Hello,\n\nYour NESTY verification code is: ${code}\nThis code is valid for 5 minutes.\nNever share this code with anyone.`;
+  const subject = 'Your NESTY Verification Code';
+  const text = `Hello,\n\nYour NESTY verification code is: ${code}\n\nThis one-time code was requested for ${purpose}.\nThis code is valid for 5 minutes.\n\nSecurity Notice: Never share this code or your password with anyone.\n\nNESTY Smart Campus Food Ordering System\nCVR College of Engineering`;
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1.5px solid #F0E6D8; border-radius: 16px; background-color: #FFFFFF;">
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #E2E8F0; border-radius: 12px; background-color: #FFFFFF;">
       <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="color: #6B1D2F; margin: 0; font-size: 22px; font-weight: 800;">NESTY Campus Canteen</h2>
-        <p style="color: #7D6B6F; font-size: 13px; margin: 4px 0 0 0;">CVR College of Engineering</p>
+        <h2 style="color: #6B1D2F; margin: 0; font-size: 20px; font-weight: 700;">NESTY Campus Canteen</h2>
+        <p style="color: #64748B; font-size: 13px; margin: 4px 0 0 0;">CVR College of Engineering</p>
       </div>
-      <p style="font-size: 14px; color: #334155; line-height: 1.5;">Use the one-time verification code below for <strong>${purpose}</strong>:</p>
-      <div style="background-color: #FFF9F0; border: 2px dashed #E5A93C; padding: 18px; text-align: center; border-radius: 12px; margin: 20px 0;">
-        <span style="font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #6B1D2F; font-family: monospace;">${code}</span>
-      </div>
-      <p style="font-size: 12px; color: #64748B; line-height: 1.4;">
-        This code is valid for <strong>5 minutes</strong>. If you did not make this request, please ignore this email.
+      <p style="font-size: 14px; color: #1E293B; line-height: 1.5; margin: 0 0 12px 0;">
+        Hello,
       </p>
-      <div style="border-top: 1px solid #F1E5D8; margin-top: 20px; padding-top: 12px; text-align: center; font-size: 11px; color: #94A3B8;">
-        NESTY Smart Campus Food Ordering System
+      <p style="font-size: 14px; color: #334155; line-height: 1.5; margin: 0 0 16px 0;">
+        Your one-time verification code for <strong>${purpose}</strong> is:
+      </p>
+      <div style="background-color: #FFF9F0; border: 1.5px dashed #E5A93C; padding: 16px; text-align: center; border-radius: 8px; margin: 16px 0;">
+        <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #6B1D2F; font-family: monospace;">${code}</span>
+      </div>
+      <p style="font-size: 13px; color: #64748B; line-height: 1.5; margin: 16px 0 8px 0;">
+        ⏱️ This code is valid for <strong>5 minutes</strong>. If you did not make this request, please ignore this email.
+      </p>
+      <p style="font-size: 12px; color: #DC2626; line-height: 1.4; margin: 0 0 16px 0;">
+        ⚠️ <strong>Security Warning:</strong> Never share this code or your account password with anyone. NESTY staff will never ask for your code.
+      </p>
+      <div style="border-top: 1px solid #E2E8F0; margin-top: 20px; padding-top: 12px; text-align: center; font-size: 11px; color: #94A3B8;">
+        NESTY Smart Campus Food Ordering System • CVR College of Engineering
       </div>
     </div>
   `;
